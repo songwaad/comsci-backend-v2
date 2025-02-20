@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -18,25 +17,16 @@ import (
 )
 
 func main() {
-	// โหลดไฟล์ .env
+	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	// ดึง SECRET_KEY จาก environment
+	// Get secret key from environment variable
 	secretKey := os.Getenv("JWT_SECRET_KEY")
 
-	dbHost := os.Getenv("DB_HOST")
-	dbPort, err := strconv.Atoi(os.Getenv("DB_PORT"))
-	if err != nil {
-		log.Fatal("Invalid DB_PORT value")
-	}
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-
-	// เชื่อมต่อฐานข้อมูล
-	db := config.LoadDatabase(dbHost, dbPort, dbUser, dbPassword, dbName)
+	// Connect to database
+	db := config.GetDB()
 
 	db.AutoMigrate(&entities.User{})
 
@@ -48,7 +38,7 @@ func main() {
 	// Setup Fiber
 	app := fiber.New()
 
-	// เปิดใช้งาน CORS Middleware
+	// CORS Middleware
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000",       // อนุญาตเฉพาะ Origin ของ Frontend
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS", // อนุญาต Methods ที่ใช้
@@ -65,17 +55,17 @@ func main() {
 	// Swagger route
 	app.Get("/swagger/*", swagger.HandlerDefault)
 
-	// JWT Middleware (ใช้กับทุกเส้นทางที่ต้องการตรวจสอบ JWT)
+	// JWT Middleware
 	app.Use(middleware.AuthMiddleware())
 
-	// Protected Route สำหรับ "admin" เท่านั้น
+	// Protected Route for "admin" only
 	app.Get("/admin", middleware.RoleMiddleware("admin"), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"message": "Welcome, admin!",
 		})
 	})
 
-	// Protected Route สำหรับ "user" เท่านั้น
+	// Protected Route for "user" only
 	app.Get("/user", middleware.RoleMiddleware("user"), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"message": "Welcome, user!",
